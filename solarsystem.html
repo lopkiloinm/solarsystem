@@ -1,0 +1,500 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simple Solar System in Babylon.js</title>
+    <style>
+        body, html {
+            width: 100%;
+            height: 100%;
+            margin: 0;
+            overflow: hidden;
+        }
+        #renderCanvas {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+    </style>
+    <script src="https://cdn.babylonjs.com/babylon.js"></script>
+    <script src="https://cdn.babylonjs.com/loaders/babylonjs.loaders.min.js"></script>
+    <script src="https://cdn.babylonjs.com/gui/babylon.gui.min.js"></script>
+</head>
+<body>
+    <canvas id="renderCanvas"></canvas>
+    <script>
+        window.onload = function() {
+            var canvas = document.getElementById("renderCanvas");
+            var engine = new BABYLON.Engine(canvas, true);
+
+            var createScene = function () {
+                var scene = new BABYLON.Scene(engine);
+                scene.clearColor = new BABYLON.Color4(0, 0, 0, 1);
+                var frameRate = 0.3; //bigger = faster
+
+                // Create a Point Light
+                var pointLight = new BABYLON.PointLight("pointLight", new BABYLON.Vector3(0, 10, 0), scene);
+
+                // Set the light intensity and color
+                pointLight.intensity = 1;
+                pointLight.diffuse = new BABYLON.Color3(1, 1, 1); // White light
+
+                var sun = BABYLON.MeshBuilder.CreateSphere("sun", {diameter: 3000*0.0093}, scene);
+                var sunMaterial = new BABYLON.StandardMaterial("sunMaterial", scene);
+                sunMaterial.emissiveColor = new BABYLON.Color3(1, 0.5, 0);
+                sunMaterial.specularColor = new BABYLON.Color3(0, 0, 0);
+                var texture = new BABYLON.Texture("textures/sun.jpg", scene);
+                texture.wAng = Math.PI; 
+                sunMaterial.diffuseTexture = texture;
+                var normalTexture = new BABYLON.Texture("textures/sunNormal.jpg", scene); 
+                normalTexture.wAng = Math.PI;
+                sunMaterial.bumpTexture = normalTexture;
+                sunMaterial.bumpTexture.level = 20;
+                sun.material = sunMaterial;
+                sun.renderingGroupId = 0;
+                /**BABYLON.SceneLoader.ImportMesh("", "textures/", "sun.glb", scene, newMeshes => {
+                    const loadedSun = newMeshes[0];
+                    loadedSun.parent = sun;
+                    loadedSun.scaling.set(14.2, 14.2, 14.2);
+                });**/
+
+                var totalFrames = scene.getEngine().getFps() * (Math.pow(100, 1.5)/100);
+                var combinedRotationAnimation = new BABYLON.Animation(name + "CombinedRotationAnimation", "rotationQuaternion", frameRate, BABYLON.Animation.ANIMATIONTYPE_QUATERNION, BABYLON.Animation.ANIMATIONLOOPMODE_CYCLE);
+
+                var rotationKeys = [];
+
+                for (var i = 0; i <= totalFrames; i++) {
+                    var yRotationAngle = (i * 2 * Math.PI) / totalFrames / 27 * 365;
+                    var zRotationAngle = Math.PI * 7.25 / 180;
+                    var yQuaternion = BABYLON.Quaternion.RotationAxis(BABYLON.Axis.Y, yRotationAngle);
+                    var zQuaternion = BABYLON.Quaternion.RotationAxis(BABYLON.Axis.Z, zRotationAngle);
+                    
+                    // First apply Y rotation, then Z rotation
+                    var combinedQuaternion = zQuaternion.multiply(yQuaternion);
+                    
+                    rotationKeys.push({ frame: i, value: combinedQuaternion });
+                }
+
+                combinedRotationAnimation.setKeys(rotationKeys);
+                sun.animations = [];
+                sun.animations.push(combinedRotationAnimation);
+                scene.beginAnimation(sun, 0, totalFrames, true);
+
+                var dummySun = new BABYLON.TransformNode("dummy");
+
+                // Add a Glow Layer to make the sun glow
+                var glow = new BABYLON.GlowLayer("glow", scene, {
+                    mainTextureFixedSize: 1024,
+                    blurKernelSize: 128
+                });
+                glow.intensity = 1; // Adjust the glow intensity**/
+                //glow.addIncludedOnlyMesh(sun);
+
+                // Skybox
+                var sphere = BABYLON.MeshBuilder.CreateSphere("sphere", {diameter: 10000}, scene);
+                var starMat = new BABYLON.StandardMaterial("stars", scene);
+
+                // Textures
+                var texStar = new BABYLON.Texture("textures/starmapC.jpg", scene, true, false);
+                texStar.wAng = Math.PI;
+                //var texStarB = new BABYLON.Texture("textures/starmapB.jpg", scene, true, false);
+
+                // Set scale to prevent tilling
+                //texStar.uScale = texStar.vScale = texStarB.uScale = texStarB.vScale = 1;
+
+                // Blend textures using emissive properties (not exactly 'lighten' but can brighten the appearance)
+                starMat.emissiveTexture = texStar;
+
+                starMat.backFaceCulling = false; // Ensure that both sides of the sphere's faces are rendered
+
+                // Applying the material
+                sphere.material = starMat;
+                //sphere.rotation.z = 23.4 * Math.PI / 180;
+                sphere.renderingGroupId = 0;
+
+                function createPlanet(name, diameter, distance, color, tilt, day) {
+                    var planet = BABYLON.MeshBuilder.CreateSphere(name, {diameter: diameter}, scene);
+                    var planetMaterial = new BABYLON.StandardMaterial(name + "Material", scene);
+                    var texture = new BABYLON.Texture("textures/"+name+".jpg", scene);
+                    texture.wAng = Math.PI; //correct orientation
+                    planetMaterial.diffuseTexture = texture;
+                    planetMaterial.specularColor = new BABYLON.Color3(0, 0, 0);
+                    planet.material = planetMaterial;
+                    planet.rotation.y = Math.PI;
+                    if (name == "earth") {
+                        var nightTexture = new BABYLON.Texture("textures/earthNight.jpg", scene);
+                        nightTexture.wAng = Math.PI;
+                        planetMaterial.emissiveTexture = nightTexture;
+                        planetMaterial.useEmissiveAsIllumination = true;
+                        planetMaterial.useLightmapAsShadowmap = true;
+                        planet.rotation.y = Math.PI;
+                        var specularTexture = new BABYLON.Texture("textures/earth_specular.jpg", scene); // Earth specular map
+                        specularTexture.wAng = Math.PI;
+                        planetMaterial.specularTexture = specularTexture;
+                        var normalTexture = new BABYLON.Texture("textures/earthNormal.jpg", scene); 
+                        normalTexture.wAng = Math.PI;
+                        planetMaterial.bumpTexture = normalTexture;
+                        planetMaterial.bumpTexture.level = 10;
+                        var clouds = BABYLON.MeshBuilder.CreateSphere("clouds", {diameter: diameter * 1.01}, scene); // a bit larger than the earth sphere
+                        clouds.parent = planet; // Align it perfectly with the Earth sphere
+                        var cloudMaterial = new BABYLON.StandardMaterial("cloudMaterial", scene);
+                        var cloudsTexture = new BABYLON.Texture("textures/earth_clouds.png", scene); // Your cloud map
+                        cloudsTexture.wAng = Math.PI;
+                        cloudMaterial.diffuseTexture = cloudsTexture;
+                        cloudMaterial.diffuseTexture.hasAlpha = true; // Ensure your cloud texture supports transparency
+                        cloudMaterial.useAlphaFromDiffuseTexture = true;
+                        cloudMaterial.specularColor = new BABYLON.Color3(0, 0, 0);
+                        // Setting the clouds to be slightly transparent overall
+                        cloudMaterial.alpha = 0.8; 
+
+                        clouds.material = cloudMaterial;
+                    }
+                    if (name == "mars") {
+                        var normalTexture = new BABYLON.Texture("textures/marsNormal.jpg", scene); 
+                        normalTexture.wAng = Math.PI;
+                        planetMaterial.bumpTexture = normalTexture;
+                        planetMaterial.bumpTexture.level = 10;
+                    }
+                    if (name == "pluto") {
+                        var dummyPluto = new BABYLON.TransformNode("dummy");
+                        dummyPluto.rotation.z = Math.PI*(17.14)/180; //when rotation not on ecliptic plane, parent to dummy tilted to plane
+                        planet.parent = dummyPluto;
+                    }
+
+                    // Orbit animation
+                    var totalFrames = scene.getEngine().getFps() * (Math.pow(distance, 1.5)/100); //kepler's third law
+                    var eYr = Math.pow(100, 1.5);
+                    var pYr = Math.pow(distance, 1.5);
+                    var positionAnimation = new BABYLON.Animation(name + "PositionAnimation", "position", frameRate, BABYLON.Animation.ANIMATIONTYPE_VECTOR3, BABYLON.Animation.ANIMATIONLOOPMODE_CYCLE);
+                    var combinedRotationAnimation = new BABYLON.Animation(name + "CombinedRotationAnimation", "rotationQuaternion", frameRate, BABYLON.Animation.ANIMATIONTYPE_QUATERNION, BABYLON.Animation.ANIMATIONLOOPMODE_CYCLE);
+
+                    var positionKeys = [];
+                    var rotationKeys = [];
+
+                    for (var i = 0; i <= totalFrames; i++) {
+                        var angle = parseInt(color.toHexString().slice(1), 16) + (i * 2 * Math.PI) / totalFrames; // initial angle based on color
+                        var x = 0 - distance * Math.sin(angle);
+                        var z = distance * Math.cos(angle);
+                        var yRotationAngle = (i * 2 * Math.PI) / totalFrames * pYr/eYr / day * 365;
+                        var zRotationAngle = Math.PI * tilt / 180;
+                        var yQuaternion = BABYLON.Quaternion.RotationAxis(BABYLON.Axis.Y, yRotationAngle);
+                        var zQuaternion = BABYLON.Quaternion.RotationAxis(BABYLON.Axis.Z, zRotationAngle);
+                        
+                        // First apply Y rotation, then Z rotation
+                        var combinedQuaternion = zQuaternion.multiply(yQuaternion);
+                        
+                        rotationKeys.push({ frame: i, value: combinedQuaternion });
+
+                        if (name == "pluto") {
+                            realAngle = 0.3 * Math.sin(angle)+angle; //approximate kepler's second law, not exact but better than nothing
+                            x = 0 - 100 * 33.82 * Math.sin(realAngle);
+                            z = 100 * (34.57 * Math.cos(realAngle) - 4.909);
+                        }
+
+                        positionKeys.push({ frame: i, value: new BABYLON.Vector3(x, 0, z) });
+                    }
+
+                    positionAnimation.setKeys(positionKeys);
+                    combinedRotationAnimation.setKeys(rotationKeys);
+
+                    // Set animations to the planet
+                    planet.animations = [];
+                    planet.animations.push(positionAnimation);
+                    planet.animations.push(combinedRotationAnimation);
+                    var dummyRot = new BABYLON.TransformNode("dummy");
+                    if (name == "pluto") {
+                        dummyRot.parent = dummyPluto;
+                    }
+                    dummyRot.animations = [];
+                    dummyRot.animations.push(positionAnimation);
+                    scene.beginAnimation(dummyRot, 0, totalFrames, true);
+
+                    // Begin animation on the planet object
+                    scene.beginAnimation(planet, 0, totalFrames, true);
+
+                    // Drawing orbital path as a circle outline
+                    var points = [];
+                    var segments = 720; // smoothness of the circle
+                    for (var i = 0; i <= segments; i++) {
+                        var angle = (i * 2 * Math.PI) / segments;
+                        var x = distance * Math.sin(angle);
+                        var z = distance * Math.cos(angle);
+                        if (name == "pluto") {
+                            x = 100 * 33.82 * Math.sin(angle);
+                            z = 100 * (34.57 * Math.cos(angle) - 4.909);
+                        }
+                        points.push(new BABYLON.Vector3(x, 0, z));
+                    }
+                    var orbitPath = BABYLON.MeshBuilder.CreateLines(name + "OrbitPath", {points: points, updatable: false}, scene);
+                    orbitPath.color = color; 
+                    orbitPath.renderingGroupId = 0; 
+                    if (name == "pluto") {
+                        orbitPath.parent = dummyPluto;
+                    }
+
+                    var advancedTexture = BABYLON.GUI.AdvancedDynamicTexture.CreateFullscreenUI("UI");
+                    var ellipse = new BABYLON.GUI.Ellipse();
+                    ellipse.width = "10px";
+                    ellipse.height = "10px";
+                    ellipse.color = color.toHexString();
+                    ellipse.thickness = 2;
+                    advancedTexture.addControl(ellipse);
+                    ellipse.linkWithMesh(planet);
+                    ellipse.zIndex = 5; // Ensuring it stays on top
+
+                    // Create a text block for the planet's name.
+                    var planetName = new BABYLON.GUI.TextBlock();
+                    planetName.text = name; 
+                    planetName.color = color.toHexString(); 
+                    planetName.fontSize = "14px";  
+                    advancedTexture.addControl(planetName);
+
+                    // Position the text block just above the ellipse
+                    planetName.linkWithMesh(planet);
+                    planetName.linkOffsetY = -20; // Adjust Y offset to position text above the planet
+
+                    // You might need to adjust z-index if layers are not visible properly
+                    planetName.zIndex = 6;
+
+                    if (name.toLowerCase() === "saturn") {
+                        // Create the rings for Saturn
+                        var ringDiameter = diameter * 1.814;
+                        var ringThickness = diameter * 0.535; 
+                        var ring = BABYLON.MeshBuilder.CreateTorus(name + "Ring", {
+                            diameter: ringDiameter,
+                            thickness: ringThickness,
+                            tessellation: 60,
+                        }, scene);
+                        ring.scaling = new BABYLON.Vector3(1, 0.01, 1);
+                        var ringMaterial = new BABYLON.StandardMaterial(name + "RingMaterial", scene);
+                        ringMaterial.diffuseTexture = new BABYLON.Texture("textures/" + name + "Ring.jpg", scene);
+                        ringMaterial.specularColor = new BABYLON.Color3(0, 0, 0);
+                        ring.material = ringMaterial;
+                        ring.parent = planet; // Parent the ring to the planet for joint animation
+                    }
+
+                    if (name.toLowerCase() === "earth") {
+                        // Create the moon for Earth
+                        var moonDiameter = diameter * 0.273; // The Moon is about 27.3% the size of Earth
+                        var moonDistance = diameter * 3; // Average distance from Earth to Moon is about 60x the Earth's radius
+                        var moon = BABYLON.MeshBuilder.CreateSphere(name + "Moon", {diameter: moonDiameter}, scene);
+                        var moonMaterial = new BABYLON.StandardMaterial(name + "MoonMaterial", scene);
+                        moonMaterial.diffuseTexture = new BABYLON.Texture("textures/moon.jpg", scene);
+                        moonMaterial.diffuseTexture.wAng = Math.PI;
+                        moonMaterial.specularColor = new BABYLON.Color3(0, 0, 0);
+                        var normalTexture = new BABYLON.Texture("textures/moonNormal.jpg", scene); 
+                        normalTexture.wAng = Math.PI;
+                        moonMaterial.bumpTexture = normalTexture;
+                        moonMaterial.bumpTexture.level = 1;
+                        moon.material = moonMaterial; 
+                        moon.originalDiameter = moonDiameter;
+                        
+                        // Position the moon relative to the parent (Earth)
+                        moon.position = new BABYLON.Vector3(moonDistance, 0, 0);
+                        var dummy = new BABYLON.TransformNode("dummy");
+                        var dummy2 = new BABYLON.TransformNode("dummy");
+                        dummy2.rotation.z = Math.PI*(5)/180; // dummy rotates the coordinate system to angle of moon's orbit to the ecliptic
+                        dummy.parent = dummyRot;
+                        dummy2.parent = dummyRot;
+                        moon.parent = dummy; // Parent the moon to the planet (Earth)
+
+                        var points = [];
+                        var segments = 720; // smoothness of the circle
+                        for (var i = 0; i <= segments; i++) {
+                            var angle = (i * 2 * Math.PI) / segments;
+                            var x = moonDistance * Math.sin(angle);
+                            var z = moonDistance * Math.cos(angle);
+                            points.push(new BABYLON.Vector3(x, 0, z));
+                        }
+                        moonColor = new BABYLON.Color3(0.5, 0.5, 0.5);
+                        var orbitPath = BABYLON.MeshBuilder.CreateLines(name + "OrbitPath", {points: points, updatable: false}, scene);
+                        orbitPath.parent = dummy2;
+                        orbitPath.color = moonColor; 
+                        orbitPath.renderingGroupId = 0;
+
+                        var moonEllipse = new BABYLON.GUI.Ellipse();
+                        moonEllipse.width = "10px";
+                        moonEllipse.height = "10px";
+                        moonEllipse.color = moonColor.toHexString();
+                        moonEllipse.thickness = 2;
+                        advancedTexture.addControl(moonEllipse);
+                        moonEllipse.linkWithMesh(moon);
+                        moonEllipse.zIndex = 5; // Ensuring it stays on top
+
+                        // Create a text block for the planet's name.
+                        var moonName = new BABYLON.GUI.TextBlock();
+                        moonName.text = "moon"; 
+                        moonName.color = moonColor.toHexString(); 
+                        moonName.fontSize = "14px";  
+                        advancedTexture.addControl(moonName);
+
+                        moonName.linkWithMesh(moon);
+                        moonName.linkOffsetY = -20;
+
+                        // Animate the Moon
+                        // Create the position animation for the moon
+                        //var moonPositionAnimation = new BABYLON.Animation(name + "MoonPositionAnimation", "position", frameRate, BABYLON.Animation.ANIMATIONTYPE_VECTOR3, BABYLON.Animation.ANIMATIONLOOPMODE_CYCLE);
+                        //var moonRotationAnimation = new BABYLON.Animation(name + "MoonRotationAnimation", "rotation.y", frameRate, BABYLON.Animation.ANIMATIONTYPE_FLOAT, BABYLON.Animation.ANIMATIONLOOPMODE_CYCLE);
+                        var mooncombinedRotationAnimation = new BABYLON.Animation(name + "CombinedRotationAnimation", "rotationQuaternion", frameRate, BABYLON.Animation.ANIMATIONTYPE_QUATERNION, BABYLON.Animation.ANIMATIONLOOPMODE_CYCLE);
+                        //var moonPositionKeys = [];
+                        //var moonRotationKeys = [];
+                        var dummyRotationKeys = [];
+
+                        for (var i = 0; i <= totalFrames; i++) {
+                            /**var moonAngle = (i * 2 * Math.PI) / totalFrames * 12; 
+                            var moonX = - moonDistance * Math.sin(moonAngle);
+                            var moonZ = moonDistance * Math.cos(moonAngle);
+                            var moonYRotation = - Math.PI / 2 - moonAngle + (i * 2 * Math.PI) / totalFrames; // one side always face earth
+
+                            moonPositionKeys.push({
+                                frame: i,
+                                value: new BABYLON.Vector3(moonX, 0, moonZ)
+                            });
+                            moonRotationKeys.push({
+                                frame: i,
+                                value: moonYRotation
+                            });**/
+                            var yRotationAngle = parseInt(color.toHexString().slice(1), 16) - (i * 2 * Math.PI) / totalFrames * 365 / 28;
+                            var zRotationAngle = Math.PI * 5 / 180;
+                            var yQuaternion = BABYLON.Quaternion.RotationAxis(BABYLON.Axis.Y, yRotationAngle);
+                            var zQuaternion = BABYLON.Quaternion.RotationAxis(BABYLON.Axis.Z, zRotationAngle);
+                            
+                            // First apply Y rotation, then Z rotation
+                            var combinedQuaternion = zQuaternion.multiply(yQuaternion);
+
+                            dummyRotationKeys.push({ frame: i, value: combinedQuaternion });
+                        }
+
+                        // Set keys to animations
+                        //moonPositionAnimation.setKeys(moonPositionKeys);
+                        //moonRotationAnimation.setKeys(moonRotationKeys);
+                        mooncombinedRotationAnimation.setKeys(dummyRotationKeys);
+
+                        // Add both animations to the moon's animation array
+                        /**moon.animations = []; // Ensure no previous animations are left
+                        moon.animations.push(moonPositionAnimation);
+                        moon.animations.push(moonRotationAnimation);**/
+                        dummy.animations = [];
+                        dummy.animations.push(mooncombinedRotationAnimation);
+
+                        // Begin the animations on the moon object in the scene
+                        scene.beginAnimation(dummy, 0, totalFrames, true);
+                        return {earth: planet, moon: moon, dummy: dummyRot}
+                    }
+                    return {planet: planet, dummy: dummyRot};
+                }
+
+                var mercury = createPlanet("mercury", 3*0.383, 100*0.39, new BABYLON.Color3(0.7, 0.4, 0.4), 0, 59);
+                var venus = createPlanet("venus", 3*0.949, 100*0.72, new BABYLON.Color3(0.9, 0.9, 0.5), 177.3, 243); 
+                var earthmoon = createPlanet("earth", 3, 100, new BABYLON.Color3(0.4, 0.4, 1), 23.4, 1);
+                var mars = createPlanet("mars", 3*0.532, 100*1.52, new BABYLON.Color3(1, 0.5, 0.5), 25.2, 1);
+                var jupiter = createPlanet("jupiter", 3*11.21, 100*5.2, new BABYLON.Color3(0.7, 0.5, 0), 3.1, 0.414);
+                var saturn = createPlanet("saturn", 3*9.45, 100*9.54, new BABYLON.Color3(0.7, 0.7, 0.5), 26.7, 0.44);
+                var uranus = createPlanet("uranus", 3*4.01, 100*19.2, new BABYLON.Color3(0.6, 0.9, 0.9), 97.77, 0.718);
+                var neptune = createPlanet("neptune", 3*3.88, 100*30.06, new BABYLON.Color3(0.5, 0.7, 0.9), 28.32, 0.671);
+                var pluto = createPlanet("pluto", 3*0.18, 100*39.48, new BABYLON.Color3(0.9, 0.8, 0.7), 122.53, 6.375);
+                
+                // Create a FollowCamera
+                var camera = new BABYLON.FollowCamera("FollowCam", new BABYLON.Vector3(1, 0, 0), scene);
+                camera.radius = 50;  // Set an initial viewing distance
+                camera.lowerRadiusLimit = 0.1;  // Closest approach to the planet
+                //camera.upperBetaLimit = Math.PI / 2;  // Limit vertical rotation to the horizontal plane
+
+                // Only attach manual zoom controls, not the entire control set
+
+                // Add custom Wheel Event listener for manual zoom handling
+                canvas.addEventListener('wheel', handleZoom);
+                canvas.addEventListener('touchmove', handlePinchZoom, {passive: false});
+
+                function handleZoom(event) {
+                    var delta = event.deltaY;
+                    zoomCamera(delta);
+                    event.preventDefault();
+                }
+
+                function handlePinchZoom(event) {
+                    if (event.touches.length === 2) {
+                        const touch1 = event.touches[0];
+                        const touch2 = event.touches[1];
+                        const distance = Math.sqrt(Math.pow(touch2.pageX - touch1.pageX, 2) + Math.pow(touch2.pageY - touch1.pageY, 2));
+
+                        if (this.lastPinchDistance != null){
+                            const delta = distance - this.lastPinchDistance;
+                            zoomCamera(delta);
+                        }
+                        this.lastPinchDistance = distance;
+                        event.preventDefault();
+                    }
+                }
+
+                function zoomCamera(delta) {
+                    var zoomFactor = camera.wheelPrecision * 0.01;
+                    if (delta > 0) {
+                        camera.radius += zoomFactor;
+                    } else {
+                        camera.radius -= zoomFactor;
+                    }
+
+                    // Clamping the radius
+                    if (camera.radius < camera.lowerRadiusLimit) {
+                        camera.radius = camera.lowerRadiusLimit;
+                    } else if (camera.upperRadiusLimit && camera.radius > camera.upperRadiusLimit) {
+                        camera.radius = camera.upperRadiusLimit;
+                    }
+                }
+
+                document.addEventListener('touchend', function(event) {
+                    if (event.touches.length < 2) {
+                        this.lastPinchDistance = null;
+                    }
+                });
+
+                canvas.addEventListener('pointerdown', handlePointerDown, {passive: false});
+
+                function handlePointerDown(event) {
+                    const startX = event.clientX;
+                    const startY = event.clientY;
+                    
+                    function pointerMoveHandler(e) {
+                        handleCameraMove(e.clientX, e.clientY, startX, startY);
+                    }
+
+                    // Adding pointermove and pointerup event listeners
+                    document.addEventListener('pointermove', pointerMoveHandler, {passive: false});
+                    document.addEventListener('pointerup', function pointerUpHandler() {
+                        document.removeEventListener('pointermove', pointerMoveHandler);
+                        document.removeEventListener('pointerup', pointerUpHandler);
+                    }, {passive: false});
+                    
+                    event.preventDefault();  // Preventing default actions for pointer events to avoid issues, e.g., with touch screens
+                }
+
+                function handleCameraMove(currentX, currentY, startX, startY) {
+                    var diffX = Math.min(startX - currentX, 100);
+                    var diffY = startY - currentY;
+                    camera.rotationOffset -= diffX * 0.1;
+                    //camera.beta -= diffY * 0.01; // optional: adjust beta for vertical rotation, remove if not needed
+ 
+                }
+                camera.wheelPrecision = 50; // Adjusts the sensitivity of the mouse wheel for zooming
+
+                camera.lockedTarget = earthmoon.moon;  // Set the target for the camera to follow earthmoon.dummy for earth, earthmoon.moon for moon
+                //sphere.parent = camera.lockedTarget; // center the skybox at the target
+
+                return scene;
+            };
+
+            var scene = createScene();
+            
+            engine.runRenderLoop(function() {
+                scene.render();
+            });
+
+            window.addEventListener("resize", function () {
+                engine.resize();
+            });
+        };
+    </script>
+</body>
+</html>
